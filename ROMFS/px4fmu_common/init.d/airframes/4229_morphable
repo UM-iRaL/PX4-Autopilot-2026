@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# @name Morphable Quadrotor
+#
+# @type Quadrotor Wide
+# @class Copter
+#
+# @maintainer Drew Scheffer <drewskis@umich.edu>
+# @maintainer Sashreek Shankar <sashreek@umich.edu>
+#
+# @board px4_fmu-v2 exclude
+# @board bitcraze_crazyflie exclude
+
+. ${R}etc/init.d/rc.mc_defaults
+
+# We use a custom mixer for the Morphable Drone
+param set-default SYS_CTRL_ALLOC 0
+param set SYS_CTRL_ALLOC 0
+
+# set VEHICLE_TYPE mc
+
+# # MAV_TYPE_QUADROTOR 2
+# param set-default MAV_TYPE 14
+
+set MIXER drew_pass
+set MIXER_AUX none
+
+# Set all 12 channels (motors, gimbal servos, arm servos)
+set PWM_OUT 123456789abc
+
+param set-default PWM_MAIN_FUNC1 101 #esc
+param set-default PWM_MAIN_FUNC2 102
+param set-default PWM_MAIN_FUNC3 103
+param set-default PWM_MAIN_FUNC4 104
+param set-default PWM_MAIN_FUNC5 201 #servo (gimbal FL)
+param set-default PWM_MAIN_FUNC6 202 #servo (gimbal FR)
+param set-default PWM_MAIN_FUNC7 203 #servo (gimbal BR)
+param set-default PWM_MAIN_FUNC8 204 #servo (gimbal BL)
+param set-default PWM_MAIN_FUNC9 205 #servo (arm FL)
+param set-default PWM_MAIN_FUNC10 206 #servo (arm FR)
+param set-default PWM_MAIN_FUNC11 207 #servo (arm BR)
+param set-default PWM_MAIN_FUNC12 208 #servo (arm BL)
+
+# L1 Quad params
+param set L1AD_ACTIVE 0 # disable L1 controller at startup

@@ -1,0 +1,891 @@
+# Trajectory Configuration for MAVROS Full State Publisher
+# Version 1.0
+#
+# This file contains all configuration for trajectory generation including:
+# - Initial setpoint values
+# - Parametric trajectory parameters
+# - Waypoint-based trajectories
+# - Hand tracking configuration
+# - Camera intrinsics
+#
+# Note: All angles in this file are in DEGREES and will be converted to radians by the loader
+# All distances are in METERS, all times in SECONDS
+
+version: "1.0"
+
+# Publishing rate for MAVROS messages
+publish_rate_hz: 20
+
+# Timeout for mode changes and arming (seconds)
+timeout_sec: 5
+
+# ==============================================================================
+# WAIT TRAJECTORY CONFIGURATION (Trajectory 10)
+# ==============================================================================
+wait_trajectory:
+  time_scaling_gain: 0.0        # Proportional gain for dynamic time-scaling feedback
+  initialization_timeout: 5.0   # Wait up to 5 seconds for position data
+  default_trajectory: "whiteboard"  # Default waypoint trajectory to use
+
+# ==============================================================================
+# KEYBOARD TELEOP CONFIGURATION (Trajectory 13)
+# ==============================================================================
+# Arrow Up/Down → ±Y (forward/back)  Arrow Right/Left → ±X (right/left)
+# Period '.' → +Z (up)   Comma ',' → -Z (down)   'a'/'d' → yaw CCW/CW
+keyboard_teleop:
+  max_velocity_xy: 0.3      # m/s  — horizontal (per axis)
+  max_velocity_z: 0.2       # m/s  — vertical
+  max_yaw_rate_deg: 20.0    # deg/s — yaw rate   (j/l keys)
+  max_pitch_rate_deg: 20.0  # deg/s — pitch rate  (i/k keys)
+  max_roll_rate_deg: 20.0   # deg/s — roll rate   (u/o keys)
+
+# ==============================================================================
+# AUTO-LAND SAFETY CONFIGURATION
+# ==============================================================================
+# Triggers emergency landing when tracking errors exceed thresholds.
+auto_land:
+  enabled: true
+
+  # Error thresholds (triggers landing if exceeded)
+  position_error_threshold: 0.5              # meters
+  orientation_error_threshold: 1.0           # radians (~57°)
+  velocity_error_threshold: 2.0              # m/s
+  angular_velocity_error_threshold: 1.5      # rad/s (~86°/s)
+
+  min_check_interval: 0.1                    # seconds between checks
+  excluded_trajectories: [6, 7, 12]  # 6=takeoff, 7=landing, 12=emergency
+  require_takeoff_complete: true             # don't check during takeoff
+  trigger_on_any_error: true                 # true=any error triggers, false=all must exceed
+  log_interval: 5.0                          # seconds (0 to disable)
+  target_trajectory: 12                      # 7=normal landing, 12=emergency landing
+
+# ==============================================================================
+# EMERGENCY LANDING CONFIGURATION (Trajectory 12)
+# ==============================================================================
+# Emergency landing for recovery from spinning/unstable states.
+# Uses rate damping to stop spinning, then hands off to the standard
+# LandingTrajectory (trajectory 7) for attitude correction and descent.
+#
+# Recovery phases:
+# 1. Rate Damping: Stop spinning by commanding zero angular rates
+# 2. Landing: Delegate to LandingTrajectory for quintic polynomial descent
+emergency_landing:
+  # Rate damping phase
+  rate_damping_threshold: 0.3     # rad/s (~17°/s) - rates below this to exit damping
+  max_rate_command: 0.5           # rad/s (~29°/s) - max angular rate to ever command
+
+  # Safety limits
+  max_stabilization_time: 15.0    # seconds - force landing if can't stabilize
+
+# ==============================================================================
+# INITIAL SETPOINT VALUES
+# ==============================================================================
+# Used when no trajectory is active or as starting values
+# Frame: ENU
+
+initial_setpoints:
+  position:
+    x: 0.0      # East (meters)
+    y: -0.22     # North (meters)
+    z: -0.04   # Up (meters)
+
+  velocity:
+    vx: 0.0     # East velocity (m/s)
+    vy: 0.0     # North velocity (m/s)
+    vz: 0.0     # Up velocity (m/s)
+
+  acceleration:
+    ax: 0.0     # ForwEastard acceleration (m/s^2)
+    ay: 0.0     # North acceleration (m/s^2)
+    az: -5.0    # Up acceleration (m/s^2)
+
+  orientation:
+    roll: 0.0   # Roll angle (degrees)
+    pitch: 0.0  # Pitch angle (degrees)
+    yaw: 0.0    # Yaw angle (degrees, 0 = North)
+
+  angular_rates:
+    rollspeed: 0.0    # Roll rate (rad/s, body frame)
+    pitchspeed: 0.0   # Pitch rate (rad/s, body frame)
+    yawspeed: 0.0     # Yaw rate (rad/s, body frame)
+
+# ==============================================================================
+# PARAMETRIC TRAJECTORY PARAMETERS
+# ==============================================================================
+# Configuration for trajectories 1-8 (equation-based trajectories)
+# The mathematical equations remain in Python code
+
+parametric_trajectories:
+  # Common parameters used by multiple trajectories
+  altitude: 1.0       # Default Z position for trajectories (meters, ENU up)
+  duration: 4.0      # Default duration for trajectories (seconds)
+
+  # Roll Sweep (Trajectory 1)
+  roll_sweep:
+    min_angle: 0.0    # Starting roll angle (degrees)
+    max_angle: -10.0  # Ending roll angle (degrees)
+
+  # Pitch Sweep (Trajectory 2)
+  pitch_sweep:
+    min_angle: 0.0    # Starting pitch angle (degrees)
+    max_angle: -90.0  # Ending pitch angle (degrees)
+
+  # Yaw Sweep (Trajectory 3)
+  yaw_sweep:
+    min_angle: 0.0    # Starting yaw angle (degrees)
+    max_angle: 10.0  # Ending yaw angle (degrees)
+
+  # Circular Path with Rotation (Trajectory 5)
+  circular_path:
+    radius: 0.5       # Circle radius (meters)
+
+  # Takeoff (Trajectory 6)
+  takeoff:
+    duration: 7.0     # Duration to ramp from ground to altitude (seconds)
+    # Note: Target altitude uses parametric_trajectories.altitude
+    # Note: Starting acceleration uses initial_setpoints.acceleration.az
+
+  # Landing (Trajectory 7)
+  landing:
+    ground_altitude: -0.30  # Ground altitude in meters (relative to home)
+    duration: 7.0          # Duration for landing descent (seconds)
+
+# ==============================================================================
+# WAYPOINT-BASED TRAJECTORIES
+# ==============================================================================
+# Used by WaitTrajectory (Trajectory 10) with quintic polynomial interpolation
+# Each waypoint specifies: position, velocity, acceleration, orientation,
+# angular_velocity, angular_acceleration, and time
+
+waypoint_trajectories:
+
+  # --------------------------------------------------------------------------
+  # SQUARE TRAJECTORY
+  # --------------------------------------------------------------------------
+  square:
+    description: "Square path with 1m sides, counterclockwise"
+    waypoints:
+      # Corner 1: Start position
+      - position: [0.0, 0.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]  # roll, pitch, yaw (degrees)
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Corner 2: Move forward (+X)
+      - position: [1.0, 0.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 5.0
+
+      # Corner 3: Move forward and left (+X, +Y)
+      - position: [1.0, 1.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 10.0
+
+      # Corner 4: Move left (+Y only)
+      - position: [0.0, 1.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 15.0
+
+      # Corner 5: Return to start
+      - position: [0.0, 0.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 20.0
+
+  # --------------------------------------------------------------------------
+  # CONSTANT X ZIGZAG Z TRAJECTORY
+  # --------------------------------------------------------------------------
+  constant_x_zigzag_z:
+    description: "Zigzag motion with alternating pitch while moving in Y, Z varies"
+    waypoints:
+      # Point 1: Start
+      - position: [0.0, 0.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Point 2: Move Y, drop Z, pitch forward
+      - position: [0.0, 0.2, 0.5]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 30.0, 0.0]  # pitch forward 30 degrees
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 2.5
+
+      # Point 3: Continue Y, rise Z, pitch back
+      - position: [0.0, 0.4, 0.9]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -30.0, 0.0]  # pitch back 30 degrees
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 5.0
+
+      # Point 4: Continue Y, drop Z, pitch forward
+      - position: [0.0, 0.6, 0.5]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 30.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 7.5
+
+      # Point 5: Final position, rise Z, pitch back
+      - position: [0.0, 0.8, 0.9]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -30.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 10.0
+
+  # --------------------------------------------------------------------------
+  # VERTICAL PICKUP AND RETURN
+  # --------------------------------------------------------------------------
+  vertical_pickup_and_return:
+    description: "Complex pickup sequence with pitch down, forward motion, and yaw rotation"
+    waypoints:
+      # Point 1: Hover at start
+      - position: [0.0, 0.0, 0.6]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Point 2: Pitch down 90deg and yaw 90deg (same position)
+      - position: [0.0, 0.0, 0.6]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -90.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 3.0
+
+      # Point 3: Drop down to half altitude
+      - position: [0.0, 0.0, 0.30]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -90.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 5.0
+
+      # Point 4: Move forward (initial x_extent = 0.75m)
+      - position: [0.0, 0.75, 0.30]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -90.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 10.0
+
+      # Point 5: 45 inches (1.143m) forward in +Y
+      - position: [0.0, 1.143, 0.30]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -90.0, 135.0]  # Add 45deg yaw
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 13.0
+
+      # Point 6: +36 inches (0.914m) more in +X direction
+      - position: [0.914, 1.20, 0.30]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -90.0, 180.0]  # Add another 45deg yaw (cumulative 180deg)
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 17
+      
+      # Point 7: Rise and 45 deg pitch
+      - position: [0.914, 1.20, 0.75]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -45.0, 270.0]  # Add another 45deg yaw (cumulative 180deg)
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 20
+
+      # Point 8: Return in X, level out pitch/roll, maintain yaw
+      - position: [0.914, 0.0, 0.75]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -45.0, 270.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 23.0
+
+      # Point 9: Return to home XY, maintain altitude
+      - position: [0.0, 0.0, 0.75]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 360.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 26.0
+
+  # --------------------------------------------------------------------------
+  # PAYLOAD DELIVERY
+  # --------------------------------------------------------------------------
+  payload_delivery:
+    description: "Payload delivery sequence: forward, pitch 90deg, move East, pause, return West, pause (assumes already at altitude)"
+
+    # Configuration variables (using YAML anchors)
+    params:
+      altitude: &altitude 1.20               # Operating altitude (meters) - should match takeoff altitude
+      forward_distance: &forward_y 0.0      # Forward distance (+Y, meters)
+      east_distance: &east_x 2.15           # East distance (+X, meters)
+      pitch_angle: &pitch 90.0             # Pitch angle (degrees)
+
+    waypoints:
+      # Point 1: Starting position (already at altitude, level orientation)
+      - position: [0.0, 0.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Point 2: Move forward (in +Y direction)
+      - position: [0.0, *forward_y, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 2.0  # t_forward
+
+      # Point 3: Pitch -90 degrees (same position)
+      - position: [0.0, *forward_y, *altitude]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, *pitch, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 5.0  # t_forward + t_pitch
+
+      # Point 4: Move East (+X direction)
+      - position: [*east_x, *forward_y, *altitude]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, *pitch, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 15.0  # t_forward + t_pitch + t_east
+
+      # Point 5: Pause at East position (maintain position for 10 seconds)
+      - position: [*east_x, *forward_y, *altitude]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, *pitch, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 21.0  # ... + t_east_pause
+
+      # Point 6: Return West (back to forward position)
+      - position: [0.0, *forward_y, *altitude]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, *pitch, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 31.0  # ... + t_west
+
+      # Point 7: Pause at West position (maintain for 10 seconds)
+      - position: [0.0, *forward_y, *altitude]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 34.0  # ... + t_west_pause
+
+  # --------------------------------------------------------------------------
+  # OBSTACLE AVOIDANCE
+  # --------------------------------------------------------------------------
+  obstacle_avoidance:
+    description: "Complex obstacle avoidance maneuver with varying attitudes"
+    waypoints:
+      # Point 1: Start
+      - position: [0.0, 0.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Point 2: Move forward, slight drop, roll and yaw
+      - position: [0.0, 1.0, 0.6]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [30.0, 0.0, 45.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 5.0
+
+      # Point 3: Move left and back, drop more, pitch back
+      - position: [-0.5, 0.5, 0.4]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -30.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 10.0
+
+      # Point 4: Continue left, return to Y=0, rise, complex attitude
+      - position: [-0.5, 0.0, 0.8]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [-30.0, 30.0, 180.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 15.0
+
+      # Point 5: Move right and back, drop slightly
+      - position: [0.1, -0.2, 0.5]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, -270.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 20.0
+
+      # Point 6: Final position (same as point 5), different attitude
+      - position: [0.1, -0.2, 0.5]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [45.0, -22.5, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 25.0
+
+  # --------------------------------------------------------------------------
+  # ZOOMING
+  # --------------------------------------------------------------------------
+  zooming:
+    description: "Fast linear motion along Y axis (10m gap)"
+    waypoints:
+      # Point 1: Start
+      - position: [0.0, 0.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Point 2: Zoom to 10m in Y direction
+      - position: [0.0, 10.0, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 10.0
+
+  # --------------------------------------------------------------------------
+  # WHITEBOARD TRAJECTORY (Default for WaitTrajectory)
+  # --------------------------------------------------------------------------
+  whiteboard:
+    description: "Whiteboard interaction: pitch down, move right, press, return"
+    interpolation: quintic_polynomial  # Options: quintic_polynomial (default), piecewise_linear
+    waypoints:
+      # Point 1: Hover at start (0 seconds)
+      - position: [0.0, -0.22, 1.20]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+
+      # Point 3: Move right (+X) 37 inches (0.9398m) 
+      - position: [0.0, -0.80, 1.20]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -90.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 8.0
+
+        # Hover before pressing
+      - position: [0.0, -0.85, 1.20]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, -90.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 10.0
+        l1_params:
+          enable: 1
+          enable_force: 0
+          enable_moment: 1
+
+      # # Point 4: Press with 4 m/s^2 acceleration (feedforward only, position/velocity unaffected)
+      # - position: [0.0, -1.00, 1.20]
+      #   velocity: [0.0, 0.0, 0.0]
+      #   acceleration: [0.0, -4.0, 0.0]  # Pressing force in -Y
+      #   orientation: [0.0, -90.0, 0.0]
+      #   angular_velocity: [0.0, 0.0, 0.0]
+      #   angular_acceleration: [0.0, 0.0, 0.0]
+      #   time: 11.0
+      #   decouple:
+      #     acceleration: true  # Don't let this acceleration affect polynomial position/velocity
+
+      # # Point 5: Continue pressing (feedforward only)
+      # - position: [0.0, -1.00, 1.20]
+      #   velocity: [0.0, 0.0, 0.0]
+      #   acceleration: [0.0, -4.0, 0.0]  # Pressing force in +X
+      #   orientation: [0.0, -90.0, 0.0]
+      #   angular_velocity: [0.0, 0.0, 0.0]
+      #   angular_acceleration: [0.0, 0.0, 0.0]
+      #   time: 14.0
+      #   decouple:
+      #     acceleration: true
+
+      # Point 4: STOP Press with 2 m/s^2 acceleration (22 seconds)
+      - position: [0.0, -0.90, 1.20]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]  
+        orientation: [0.0, -90.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 17.0
+        l1_params:
+          enable: 1
+          enable_force: 1
+          enable_moment: 1
+      
+      # Move back a bit from board
+      - position: [0.0, -0.70, 1.20]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0] 
+        orientation: [0.0, -90.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 22.0
+
+      # Point 5: Return to (0,0,z) with zero pitch and yaw
+      - position: [0.0, -0.20, 1.20]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 26.0
+
+  # --------------------------------------------------------------------------
+  # CROSS WRAPPING TRAJECTORY
+  # --------------------------------------------------------------------------
+  cross:
+    description: "Wrap rope around cross structure with two circular loops in tilted planes"
+    waypoints:
+      # Loop 1: Plane tilted +45 degrees (Z increases with X)
+
+      # Point 1: Behind cross
+      - position: [0.0, 0.7, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, -90.0]  # pitch=45deg, yaw facing cross center
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Point 2: Right-high (loop radius * cos(45), 0, center + radius * sin(45))
+      - position: [0.495, 0.0, 1.195]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 2.5
+
+      # Point 3: Front of cross
+      - position: [0.0, -0.7, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 5.0
+
+      # Point 4: Left-low
+      - position: [-0.495, 0.0, 0.205]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, 180.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 7.5
+
+      # Loop 2: Plane tilted -45 degrees (Z decreases with X)
+
+      # Point 5: Behind cross (start of loop 2)
+      - position: [0.0, 0.7, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, -90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 10.0
+
+      # Point 6: Right-low
+      - position: [0.495, 0.0, 0.205]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 12.5
+
+      # Point 7: Front of cross
+      - position: [0.0, -0.7, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 15.0
+
+      # Point 8: Left-high
+      - position: [-0.495, 0.0, 1.195]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, 180.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 17.5
+
+      # Point 9: Return to first position to complete both loops
+      - position: [0.0, 0.7, 0.7]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 45.0, -90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 20.0
+
+  # --------------------------------------------------------------------------
+  # ROOF INSPECTION TRAJECTORY
+  # --------------------------------------------------------------------------
+  roof_inspection:
+    description: "Roof inspection: pitch up to look at ceiling, angled descent, return to hover"
+    waypoints:
+      # Point 1: Initial hover at 0.7m
+      - position: [0.0, -0.22, 0.50]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Point 2: Pitch up 180 degrees (looking straight up/behind)
+      - position: [0.0, -0.22, 0.70]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 180.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 8.0
+
+      # Point 3: Move -3.5 m in X direction
+      - position: [0.0, -0.22, 0.70]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 180.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 10.0
+
+      # Point 4: Add -30 degree roll (tilted to the side while pitched up)
+      - position: [0.0, -0.22, 0.70]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [-30.0, 180.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 14.0
+
+      # Point 5: Move down the -30 degree vector 
+      - position: [0.0, -0.22, 0.70]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [-30.0, 180.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 16.0
+
+      # Point 6: 90 deg yaw to convert roll to pitch (now 135 deg pitch, 0 roll)
+      - position: [0.0, -0.22, 0.70]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 135.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 20.0
+
+      # Point 7: Return to zero pitch
+      - position: [0.0, -0.22, 0.70]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 28.0
+
+      # Point 8: Move back to origin in +X direction, return to hover position
+      - position: [0.0, -0.22, 0.70]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 30.0
+
+  # --------------------------------------------------------------------------
+  # VALVE TURNING TRAJECTORY
+  # --------------------------------------------------------------------------
+  valve_turning:
+    description: "Valve turning maneuver: pitch/roll/yaw to approach, diagonal motion, roll flip, return along opposite diagonal"
+    waypoints:
+      # Point 1: Hover at 1m altitude, level orientation
+      - position: [0.0, -0.22, 1.0]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+      # Point 2: Pitch up 45 deg, roll 45 deg, yaw 90 deg (same position)
+      - position: [0.0, -0.22, 1.0]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [45.0, 45.0, 90.0]  # roll=45, pitch=45, yaw=90
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 8.0
+
+      # Point 3: Move 50cm along the 45 deg pitch vector in -Y direction
+      # At yaw=90 and pitch=45, forward-diagonal goes -Y and +Z
+      # dy = -0.5*cos(45) = -0.354m, dz = +0.5*sin(45) = +0.354m
+      - position: [0.68, -0.22, 1.92]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [45.0, 45.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 16.0
+
+      # Point 4: Roll -90 degrees (from 45 to -45 deg roll), same position
+      - position: [0.68, -0.26, 1.92]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [-45.0, 45.0, 90.0]  # roll flipped from 45 to -45
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 21.0
+
+      # Point 5: Return along opposite diagonal (+Y, -Z) following 45 deg pitch vector down
+      # Reverse of Point 3 motion: dy = +0.354m, dz = -0.354m (back to ~1.0m)
+      - position: [0.0, -0.26, 1.0]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [-45.0, 45.0, 90.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 26.0
+
+      # Point 6: Stabilize at level orientation (0 pitch, 0 roll, 0 yaw)
+      - position: [0.0, -0.22, 1.0]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 31.0
+
+  # --------------------------------------------------------------------------
+  # Test Trajectory
+  # --------------------------------------------------------------------------
+  test:
+    description: "Simple tests for trajectories."
+    waypoints:
+      # Point 1: Initial hover at 0.5 m
+      - position: [0.0, -0.22, 0.5]
+        velocity: [0.0, 0.0, 0.0]
+        acceleration: [0.0, 0.0, 0.0]
+        orientation: [0.0, 0.0, 0.0]
+        angular_velocity: [0.0, 0.0, 0.0]
+        angular_acceleration: [0.0, 0.0, 0.0]
+        time: 0.0
+
+
+# ==============================================================================
+# HAND TRACKING CONFIGURATION (Trajectory 9)
+# ==============================================================================
+hand_tracking:
+  enabled: false  # Set to true to enable hand tracking initialization at startup
+
+  camera:
+    topic: "/camera/fisheye1/image_raw"
+    width: 848
+    height: 800
+
+    # Camera intrinsics (RealSense T265 fisheye camera)
+    intrinsics:
+      fx: 286.35        # Focal length X (pixels)
+      fy: 286.59        # Focal length Y (pixels)
+      cx: 410.71        # Principal point X (pixels)
+      cy: 383.85        # Principal point Y (pixels)
+
+    # Distortion coefficients (Kannala-Brandt fisheye model)
+    distortion:
+      k1: -0.013254529796540737
+      k2: 0.05184014141559601
+      k3: -0.048199839890003204
+      k4: 0.009450089186429977
+
+    fisheye_zoom: 2.0   # Zoom factor for fisheye undistortion
+
+  control:
+    yaw_gain: 0.7       # Proportional gain for yaw control
+    pitch_gain: 0.6     # Proportional gain for pitch control
+    roll_gain: 0.45      # Proportional gain for roll control
+    max_pitch_deg: 45.0 # Maximum pitch angle (degrees)
+    max_roll_deg: 45.0  # Maximum roll angle (degrees)
+
+  thresholds:
+    pixel_deadzone_x: 0          # Pixel deadzone for X direction
+    pixel_deadzone_y: 0          # Pixel deadzone for Y direction
+    hand_angle_deadzone_deg: 0.0  # Hand angle deadzone (degrees)
+    target_loss_timeout: 2.0      # Time before target loss triggers action (seconds)
+    initialization_timeout: 5.0   # Wait time to find hand before starting control (seconds)

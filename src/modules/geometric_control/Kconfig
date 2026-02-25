@@ -1,0 +1,12 @@
+menuconfig MODULES_GEOMETRIC_CONTROL
+	bool "geometric_control"
+	default n
+	---help---
+		Enable support for sih
+
+menuconfig USER_GEOMETRIC_CONTROL
+	bool "geometric_control running as userspace module"
+	default y
+	depends on BOARD_PROTECTED && MODULES_GEOMETRIC_CONTROL
+	---help---
+		Put geometric_control in userspace memory

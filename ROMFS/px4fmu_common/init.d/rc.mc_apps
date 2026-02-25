@@ -15,10 +15,13 @@ control_allocator start
 #
 mc_rate_control start
 
+geometric_control start
+dynamixel_driver start
+
 #
 # Start Multicopter Attitude Controller.
 #
-mc_att_control start
+# mc_att_control start  # Disabled - using geometric_control instead
 
 if param greater -s MC_AT_EN 0
 then
@@ -29,8 +32,8 @@ fi
 # Start Multicopter Position Controller.
 #
 mc_hover_thrust_estimator start
-flight_mode_manager start
-mc_pos_control start
+# flight_mode_manager start  # Needed to publish trajectory_setpoint for geometric_control
+# mc_pos_control start  # Disabled - using geometric_control instead
 
 #
 # Start Multicopter Land Detector.

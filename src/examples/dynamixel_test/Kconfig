@@ -1,0 +1,5 @@
+menuconfig EXAMPLES_DYNAMIXEL_TEST
+	bool "dynamixel_test"
+	default n
+	---help---
+		Enable support for dynamixel test app

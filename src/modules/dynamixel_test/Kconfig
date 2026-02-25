@@ -1,0 +1,5 @@
+menuconfig MODULES_DYNAMIXEL_TEST
+	bool "dynamixel_test"
+	default y
+	---help---
+		Enable support for dynamixel test app

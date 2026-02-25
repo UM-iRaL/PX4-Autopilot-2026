@@ -59,6 +59,9 @@ set(msg_files
 	Cpuload.msg
 	DatamanRequest.msg
 	DatamanResponse.msg
+	dynamixel_controls.msg
+	tilting_mc_desired_angles.msg
+	tilting_servo_sp.msg
 	DebugArray.msg
 	DebugKeyValue.msg
 	DebugValue.msg

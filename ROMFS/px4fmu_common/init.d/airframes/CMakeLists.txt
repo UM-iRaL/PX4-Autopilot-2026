@@ -179,3 +179,11 @@ if(CONFIG_MODULES_SPACECRAFT)
 		70000_atmos
 	)
 endif()
+
+# iRaL Morphable Drone custom airframes
+px4_add_romfs_files(
+	4229_morphable
+	25001_generic_tilting_multirotor
+	25002_koala_tilting_octo_H
+	25003_NDT_tilting
+)

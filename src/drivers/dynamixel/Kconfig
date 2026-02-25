@@ -1,0 +1,5 @@
+menuconfig DRIVERS_DYNAMIXEL
+    bool "dynamixel"
+    default y
+    ---help---
+        Enable support for dynamixel

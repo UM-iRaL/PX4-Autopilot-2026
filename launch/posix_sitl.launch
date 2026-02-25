@@ -14,7 +14,13 @@
     <arg name="vehicle" default="iris"/>
     <arg name="world" default="$(find mavlink_sitl_gazebo)/worlds/empty.world"/>
     <arg name="sdf" default="$(find mavlink_sitl_gazebo)/models/$(arg vehicle)/$(arg vehicle).sdf"/>
-    <env name="PX4_SIM_MODEL" value="gazebo-classic_$(arg vehicle)" />
+    <env name="PX4_SIM_MODEL" value="$(arg vehicle)" />
+    <env name="PX4_ESTIMATOR" value="$(arg est)" />
+
+    <!-- Gazebo environment variables for PX4 plugins -->
+    <env name="GAZEBO_PLUGIN_PATH" value="$(find px4)/build/px4_sitl_default/build_gazebo:$(optenv GAZEBO_PLUGIN_PATH)" />
+    <env name="GAZEBO_MODEL_PATH" value="$(find mavlink_sitl_gazebo)/models:$(optenv GAZEBO_MODEL_PATH)" />
+    <env name="LD_LIBRARY_PATH" value="$(find px4)/build/px4_sitl_default/build_gazebo:$(optenv LD_LIBRARY_PATH)" />
 
     <!-- gazebo configs -->
     <arg name="gui" default="true"/>

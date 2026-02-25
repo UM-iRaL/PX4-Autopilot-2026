@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# @name Morphable Quadrotor with Camera
+#
+# @type Quadrotor Wide
+#
+# @maintainer Drew Scheffer <drewskis@umich.edu>
+#
+
+. ${R}etc/init.d/rc.mc_defaults
+
+param set-default SYS_CTRL_ALLOC 0
+param set SYS_CTRL_ALLOC 0
+
+# set VEHICLE_TYPE mc
+
+# # MAV_TYPE_QUADROTOR 2
+# param set-default MAV_TYPE 14
+
+set MIXER drew_pass
+set MIXER_AUX none
+
+# Enable all 12 outputs (motors + gimbal servos + arm servos)
+# These go through mixer → actuator_outputs → HIL_ACTUATOR_CONTROLS → Gazebo
+set PWM_OUT 123456789abc
+
+param set-default PWM_MAIN_FUNC1 101 #motor
+param set-default PWM_MAIN_FUNC2 102
+param set-default PWM_MAIN_FUNC3 103
+param set-default PWM_MAIN_FUNC4 104
+param set-default PWM_MAIN_FUNC5 201 #gimbal servo
+param set-default PWM_MAIN_FUNC6 202
+param set-default PWM_MAIN_FUNC7 203
+param set-default PWM_MAIN_FUNC8 204
+param set-default PWM_MAIN_FUNC9 205 #arm servo
+param set-default PWM_MAIN_FUNC10 206
+param set-default PWM_MAIN_FUNC11 207
+param set-default PWM_MAIN_FUNC12 208
+
+# Geometric controller position gains
+param set-default MPC_XY_P 6.0
+param set-default MPC_Z_P 12.0
+
+# Geometric controller velocity gains
+param set-default MPC_XY_VEL_P_ACC 4.0
+param set-default MPC_Z_VEL_P_ACC 7.0
+
+# Geometric controller attitude gains
+param set-default MC_ROLL_P 0.8
+param set-default MC_PITCH_P 0.3
+param set-default MC_YAW_P 0.8
+
+# Geometric controller rate gains
+param set-default MC_ROLLRATE_K 0.6
+param set-default MC_PITCHRATE_K 0.35
+param set-default MC_YAWRATE_K 0.30
+
+# L1 Quad params
+param set L1AD_ACTIVE 0 # disable L1 controller at startup

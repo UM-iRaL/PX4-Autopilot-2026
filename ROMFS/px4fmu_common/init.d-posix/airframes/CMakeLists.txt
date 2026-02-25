@@ -121,4 +121,15 @@ px4_add_romfs_files(
 	70001_gz_atmos_dual
 
 	# [22000, 22999] Reserve for custom models
+
+	# iRaL Morphable Drone custom airframes
+	4229_morphable
+	4022_gz_morphable
+	4230_morphable_camera
+	25001_generic_tilting_multirotor
+	25002_koala_tilting_octo_H
+	25003_NDT_tilting
+	25004_baby_k
+	25005_baby_k_interaction
+	25006_koala
 )

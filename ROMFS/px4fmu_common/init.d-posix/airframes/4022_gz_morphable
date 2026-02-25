@@ -1,0 +1,96 @@
+#!/bin/sh
+#
+# @name Gazebo Morphable Quadrotor
+#
+# @type Quadrotor Wide
+#
+# @maintainer Drew Scheffer <drewskis@umich.edu>
+#
+# Gz-sim (Gazebo Harmonic) variant of the morphable tilting quadrotor.
+# Motor layout: FL(cw)=0, FR(ccw)=1, BR(cw)=2, BL(ccw)=3
+# Servos:       servo_0=FL, servo_1=FR, servo_2=BR, servo_3=BL
+#
+
+. ${R}etc/init.d/rc.mc_defaults
+
+PX4_SIMULATOR=${PX4_SIMULATOR:=gz}
+PX4_GZ_WORLD=${PX4_GZ_WORLD:=default}
+PX4_SIM_MODEL=${PX4_SIM_MODEL:=gz_morphable}
+
+param set-default SIM_GZ_EN 1
+
+# Use new-style control allocation
+param set-default CA_AIRFRAME 0
+param set-default CA_ROTOR_COUNT 4
+
+# Rotor positions (metres from body centre, same as Gazebo Classic model)
+# Motor 0: FL  ( 0.18844,  0.12869) cw
+param set-default CA_ROTOR0_PX  0.18844
+param set-default CA_ROTOR0_PY  0.12869
+param set-default CA_ROTOR0_KM -0.05
+
+# Motor 1: FR  ( 0.18844, -0.12869) ccw
+param set-default CA_ROTOR1_PX  0.18844
+param set-default CA_ROTOR1_PY -0.12869
+param set-default CA_ROTOR1_KM  0.05
+
+# Motor 2: BR  (-0.18844, -0.12869) cw
+param set-default CA_ROTOR2_PX -0.18844
+param set-default CA_ROTOR2_PY -0.12869
+param set-default CA_ROTOR2_KM -0.05
+
+# Motor 3: BL  (-0.18844,  0.12869) ccw
+param set-default CA_ROTOR3_PX -0.18844
+param set-default CA_ROTOR3_PY  0.12869
+param set-default CA_ROTOR3_KM  0.05
+
+# ESC (motor) output mapping
+param set-default SIM_GZ_EC_FUNC1 101
+param set-default SIM_GZ_EC_FUNC2 102
+param set-default SIM_GZ_EC_FUNC3 103
+param set-default SIM_GZ_EC_FUNC4 104
+
+param set-default SIM_GZ_EC_MIN1 150
+param set-default SIM_GZ_EC_MIN2 150
+param set-default SIM_GZ_EC_MIN3 150
+param set-default SIM_GZ_EC_MIN4 150
+
+param set-default SIM_GZ_EC_MAX1 2500
+param set-default SIM_GZ_EC_MAX2 2500
+param set-default SIM_GZ_EC_MAX3 2500
+param set-default SIM_GZ_EC_MAX4 2500
+
+# Servo output mapping (tilting arms: FL, FR, BR, BL)
+param set-default SIM_GZ_SV_FUNC1 201
+param set-default SIM_GZ_SV_FUNC2 202
+param set-default SIM_GZ_SV_FUNC3 203
+param set-default SIM_GZ_SV_FUNC4 204
+
+param set-default SIM_GZ_SV_MIN1 -90
+param set-default SIM_GZ_SV_MIN2 -90
+param set-default SIM_GZ_SV_MIN3 -90
+param set-default SIM_GZ_SV_MIN4 -90
+
+param set-default SIM_GZ_SV_MAX1  90
+param set-default SIM_GZ_SV_MAX2  90
+param set-default SIM_GZ_SV_MAX3  90
+param set-default SIM_GZ_SV_MAX4  90
+
+# Flight dynamics — matched to morphable physical parameters
+param set-default MPC_THR_HOVER 0.60
+param set-default NAV_DLL_ACT 2
+
+# Geometric controller gains (from 4229_morphable)
+param set-default MPC_XY_P 6.0
+param set-default MPC_Z_P 12.0
+param set-default MPC_XY_VEL_P_ACC 4.0
+param set-default MPC_Z_VEL_P_ACC 7.0
+param set-default MC_ROLL_P 0.8
+param set-default MC_PITCH_P 0.3
+param set-default MC_YAW_P 0.8
+param set-default MC_ROLLRATE_K 0.6
+param set-default MC_PITCHRATE_K 0.35
+param set-default MC_YAWRATE_K 0.30
+
+# Disable L1 adaptive controller at startup
+param set L1AD_ACTIVE 0

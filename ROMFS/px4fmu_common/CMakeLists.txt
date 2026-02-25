@@ -36,3 +36,7 @@ add_subdirectory(init.d)
 if("${PX4_BOARD}" MATCHES "sitl")
 	add_subdirectory(init.d-posix)
 endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/mixers/CMakeLists.txt)
+	add_subdirectory(mixers)
+endif()

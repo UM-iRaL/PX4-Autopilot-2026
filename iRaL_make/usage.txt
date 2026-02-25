@@ -1,0 +1,70 @@
+#### INSTALLATION ####
+
+
+## Terminal 1 ##
+make all
+make gazebo
+source ~/.bashrc
+make gazebo_classic_fix_build
+
+# CLONE REPO, branch fmu_spinning
+# switch Morphable-Drone/Tools/sitl_gazebo to branch iRaL
+cd Morphable-Drone/Tools/sitl_gazebo
+git checkout iral
+
+cd Morphable-Drone
+make px4_sitl gazebo_morphable
+
+## Terminal 2 ##
+source /opt/ros/noetic/setup.bash
+roslaunch mavros px4.launch fcu_url:=udp://:14540@
+
+
+## Terminal w ##
+source /opt/ros/noetic/setup.bash
+cd iRaL/Morphable-Drone/scripts
+python3 mavros_full_state_setpoint_publisher.py
+
+
+
+
+
+#### FIXES ####
+
+
+## Running into tag issues? ##
+# create a local semver tag so git describe returns a v* string
+git tag v1.16.0
+
+# verify it resolves to that tag
+git describe --tags --dirty --always
+
+
+## Submodules missing after cloning? ##
+git config --file .gitmodules submodule.Tools/sitl_gazebo.url git@github.com:UM-iRaL/sitl-gazebo.git
+git submodule sync --recursive
+rm -rf Tools/sitl_gazebo
+git submodule update --init --recursive
+
+
+## MAVROS missing? ##
+# 1) Install MAVROS (includes mavros_msgs) + extras
+sudo apt update
+sudo apt install -y ros-noetic-mavros ros-noetic-mavros-extras
+
+# 2) Install GeographicLib datasets (required by MAVROS)
+sudo /opt/ros/noetic/lib/mavros/install_geographiclib_datasets.sh
+
+# 3) Source ROS Noetic for this shell
+source /opt/ros/noetic/setup.bash
+
+# 4) (optional) sanity check that mavros_msgs is visible
+rospack find mavros_msgs   # should print a path
+python3 -c "import mavros_msgs; print('mavros_msgs OK')"
+
+## GeoLib Missing? ##
+# Install the datasets (needs sudo; takes ~100–200 MB)
+sudo /opt/ros/noetic/lib/mavros/install_geographiclib_datasets.sh
+
+# sanity check
+ls -l /usr/share/GeographicLib/geoids/egm96-5.pgm
