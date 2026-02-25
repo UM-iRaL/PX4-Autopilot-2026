@@ -41,6 +41,8 @@ pkg_check_modules(GSTREAMER_APP gstreamer-app-1.0)
 if (NOT GSTREAMER_FOUND OR NOT GSTREAMER_APP_FOUND)
     message(WARNING "GStreamer and Gstreamer App are required to build this plugin.")
 else()
+    link_directories(${GSTREAMER_LIBRARY_DIRS} ${GSTREAMER_APP_LIBRARY_DIRS})
+
     add_library(${PROJECT_NAME} SHARED
         GstCameraSystem.cpp
     )
